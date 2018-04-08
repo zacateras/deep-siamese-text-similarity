@@ -1,3 +1,3 @@
 {
-    "python.pythonPath": "${env:PYTHONPATH}/venv/bin/python"
+    "python.pythonPath": "${workspaceRoot}/venv/bin/python"
 }
