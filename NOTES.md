@@ -1,10 +1,15 @@
-[<i>"Siamese Recurrent Architectures for Learning Sentence Similarity"</i>](http://www.aaai.org/ocs/index.php/AAAI/AAAI16/paper/download/12195/12023) - Jonas Mueller (MIT), Aditya Thyagarajan (RIT)
-[<i>"Learning Text Similarity with Siamese Recurrent Networks"</i>](http://aclweb.org/anthology/W16-1617) - Paul Neculoiu, Maarten Versteegh and Mihai Rotaru, Textkernel B.V. Amsterdam
+* [<i>"Siamese Recurrent Architectures for Learning Sentence Similarity"</i>](http://www.aaai.org/ocs/index.php/AAAI/AAAI16/paper/download/12195/12023) - Jonas Mueller (MIT), Aditya Thyagarajan (RIT)
+* [<i>"Learning Text Similarity with Siamese Recurrent Networks"</i>](http://aclweb.org/anthology/W16-1617) - Paul Neculoiu, Maarten Versteegh and Mihai Rotaru, Textkernel B.V. Amsterdam
+
+RNN
+===
+* [<i>"A friendly introduction to Recurrent Neural Networks"</i>](https://www.youtube.com/watch?v=UNmqTiOnRfg)
 
 LSTM
 ===
 * [<i>"Recurrent Neural Networks (RNN) and Long Short-Term Memory (LSTM)"</i>](https://www.youtube.com/watch?v=WCUNPb-5EYI)
 * [<i>"Understanding LSTM Networks"</i>](http://colah.github.io/posts/2015-08-Understanding-LSTMs/)
+* [<i>"CS231n Lecture 10 - Recurrent Neural Networks, Image Captioning, LSTM"</i>](https://www.youtube.com/watch?v=iX5V1WpxxkY)
 
 Siamese Networks
 ===
