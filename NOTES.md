@@ -4,6 +4,7 @@
 RNN
 ===
 * [<i>"A friendly introduction to Recurrent Neural Networks"</i>](https://www.youtube.com/watch?v=UNmqTiOnRfg)
+* [<i>"RNN18. NLP Word2Vec, Andrew Ng"</i>](https://www.youtube.com/watch?v=diUiV48q-5c)
 
 LSTM
 ===
@@ -22,6 +23,13 @@ TensorFlow
 ===
 * [Coding TensorFlow](https://www.youtube.com/playlist?list=PLQY2H8rRoyvwLbzbnKJ59NkZvQAW9wLbx) - Laurence Moroney
 * [TensorFlow 101 (Really Awesome Intro Into TensorFlow)](https://www.youtube.com/watch?v=oxf3o8IbCk4) - Brian Sletten @ Devoxx Poland 201
+
+DataSets
+===
+* [SemEval - Wiki](http://ixa2.si.ehu.es/stswiki/index.php/Main_Page#Interpretable_STS)
+* [SemEval 2017 - STS](http://alt.qcri.org/semeval2017/task1/)
+* [SemEval 2016 - STS](http://alt.qcri.org/semeval2016/task1/)
+* [SemEval 2015 - STS](http://alt.qcri.org/semeval2015/task2/)
 
 Definitions
 ---

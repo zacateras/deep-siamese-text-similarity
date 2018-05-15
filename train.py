@@ -8,7 +8,6 @@ import time
 import datetime
 import gc
 from input_helpers import InputHelper
-from siamese_network import SiameseLSTM
 from siamese_network_semantic import SiameseLSTMw2v
 from tensorflow.contrib import learn
 import gzip
@@ -24,10 +23,17 @@ tf.flags.DEFINE_string("word2vec_model", "wiki.simple.vec", "word2vec pre-traine
 tf.flags.DEFINE_string("word2vec_format", "text", "word2vec pre-trained embeddings file format (bin/text/textgz)(default: None)")
 
 tf.flags.DEFINE_integer("embedding_dim", 300, "Dimensionality of character embedding (default: 300)")
-tf.flags.DEFINE_float("dropout_keep_prob", 1.0, "Dropout keep probability (default: 1.0)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularizaion lambda (default: 0.0)")
 tf.flags.DEFINE_string("training_files", "person_match.train2", "training file (default: None)")  #for sentence semantic similarity use "train_snli.txt"
-tf.flags.DEFINE_integer("hidden_units", 50, "Number of hidden units (default:50)")
+
+# RNN stack parameters
+tf.flags.DEFINE_float("side1_dropout", 1.0, "Dropout keep probability (default: 1.0)")
+tf.flags.DEFINE_float("side2_dropout", 1.0, "Dropout keep probability (default: 1.0)")
+tf.flags.DEFINE_integer("side1_layers", 3, "Number of LSTM layers for Side_1 (default: 3)")
+tf.flags.DEFINE_integer("side2_layers", 3, "Number of LSTM layers for Side_2 (default: 3)")
+tf.flags.DEFINE_integer("sides_out_units", 50, "Number of out units for both Sides (default:50)")
+tf.flags.DEFINE_integer("side1_hidden_units", 50, "Number of hidden units for Side_1 (default:50)")
+tf.flags.DEFINE_integer("side2_hidden_units", 50, "Number of hidden units for Side_2 (default:50)")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
@@ -79,23 +85,19 @@ with tf.Graph().as_default():
     print("started session")
     with sess.as_default():
         if FLAGS.is_char_based:
-            siameseModel = SiameseLSTM(
-                sequence_length=max_document_length,
-                vocab_size=len(vocab_processor.vocabulary_),
-                embedding_size=FLAGS.embedding_dim,
-                hidden_units=FLAGS.hidden_units,
-                l2_reg_lambda=FLAGS.l2_reg_lambda,
-                batch_size=FLAGS.batch_size
-            )
+            pass # Removed as char based model is not a part of the project
         else:
             siameseModel = SiameseLSTMw2v(
                 sequence_length=max_document_length,
                 vocab_size=len(vocab_processor.vocabulary_),
                 embedding_size=FLAGS.embedding_dim,
-                hidden_units=FLAGS.hidden_units,
-                l2_reg_lambda=FLAGS.l2_reg_lambda,
                 batch_size=FLAGS.batch_size,
-                trainableEmbeddings=trainableEmbeddings
+                trainableEmbeddings=trainableEmbeddings,
+                side1_layers=FLAGS.side1_layers,
+                side2_layers=FLAGS.side2_layers,
+                sides_out_units=FLAGS.sides_out_units,
+                side1_hidden_units=FLAGS.side1_hidden_units,
+                side2_hidden_units=FLAGS.side2_hidden_units
             )
         # Define Training procedure
         global_step = tf.Variable(0, name="global_step", trainable=False)
@@ -187,20 +189,23 @@ with tf.Graph().as_default():
                 siameseModel.input_x1: x1_batch,
                 siameseModel.input_x2: x2_batch,
                 siameseModel.input_y: y_batch,
-                siameseModel.dropout_keep_prob: FLAGS.dropout_keep_prob,
+                siameseModel.side1_dropout: FLAGS.side1_dropout,
+                siameseModel.side2_dropout: FLAGS.side2_dropout,
             }
         else:
             feed_dict = {
                 siameseModel.input_x1: x2_batch,
                 siameseModel.input_x2: x1_batch,
                 siameseModel.input_y: y_batch,
-                siameseModel.dropout_keep_prob: FLAGS.dropout_keep_prob,
+                siameseModel.side1_dropout: FLAGS.side1_dropout,
+                siameseModel.side2_dropout: FLAGS.side2_dropout,
             }
         _, step, loss, accuracy, dist, sim, summaries = sess.run([tr_op_set, global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.distance, siameseModel.temp_sim, train_summary_op],  feed_dict)
         time_str = datetime.datetime.now().isoformat()
-        print("TRAIN {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
+        if step % 100 == 0:
+            print("TRAIN {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
         train_summary_writer.add_summary(summaries, step)
-        print(y_batch, dist, sim)
+        # print(y_batch, dist, sim)
 
     def dev_step(x1_batch, x2_batch, y_batch):
         """
@@ -211,20 +216,22 @@ with tf.Graph().as_default():
                 siameseModel.input_x1: x1_batch,
                 siameseModel.input_x2: x2_batch,
                 siameseModel.input_y: y_batch,
-                siameseModel.dropout_keep_prob: 1.0,
+                siameseModel.side1_dropout: 1.0,
+                siameseModel.side2_dropout: 1.0,
             }
         else:
             feed_dict = {
                 siameseModel.input_x1: x2_batch,
                 siameseModel.input_x2: x1_batch,
                 siameseModel.input_y: y_batch,
-                siameseModel.dropout_keep_prob: 1.0,
+                siameseModel.side1_dropout: 1.0,
+                siameseModel.side2_dropout: 1.0,
             }
         step, loss, accuracy, sim, summaries = sess.run([global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.temp_sim, dev_summary_op],  feed_dict)
         time_str = datetime.datetime.now().isoformat()
         print("DEV {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
         dev_summary_writer.add_summary(summaries, step)
-        print (y_batch, sim)
+        # print (y_batch, sim)
         return accuracy
 
     # Generate batches
