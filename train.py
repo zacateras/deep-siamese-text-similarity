@@ -14,7 +14,9 @@ from random import random
 
 # Parameters
 # ==================================================
-tf.flags.DEFINE_string("training_files", "data/train_snli.txt", "training file (default: None)")
+tf.flags.DEFINE_string("training_file", "data/train_snli.txt", "training file (default: None)")
+tf.flags.DEFINE_integer("training_y_position", 0, "position of y in training file (default: 0)")
+tf.flags.DEFINE_float("training_y_scale", 5.0, "scale of y in training file (default: 5.0)")
 
 # Embedding parameters
 tf.flags.DEFINE_string("word2vec_model", "wiki.simple.vec", "word2vec pre-trained embeddings file (default: None)")
@@ -46,14 +48,14 @@ print("\nParameters:")
 for attr, value in sorted(FLAGS.__flags.items()):
   print("{} = {}".format(attr.upper(), value))
 
-if FLAGS.training_files==None:
-  print("Input Files List is empty. use --training_files argument.")
+if FLAGS.training_file==None:
+  print("Input File path is empty. use --training_file argument.")
   exit()
 
 max_document_length=15
 inpH = InputHelper()
 train_set, dev_set, vocab_processor, sum_no_of_batches = inpH.getDataSets(
-FLAGS.training_files, max_document_length, 10, FLAGS.batch_size)
+  FLAGS.training_file, FLAGS.training_y_position, max_document_length, 10, FLAGS.batch_size)
 
 trainableEmbeddings=False
 if FLAGS.word2vec_model==None:
@@ -112,7 +114,7 @@ with tf.Graph().as_default():
 
   # Summaries for loss and accuracy
   loss_summary = tf.summary.scalar("loss", siameseModel.loss)
-  acc_summary = tf.summary.scalar("accuracy", siameseModel.accuracy)
+  acc_summary = tf.summary.scalar("accuracy_gs", siameseModel.accuracy)
 
   # Train Summaries
   train_summary_op = tf.summary.merge([loss_summary, acc_summary, grad_summaries_merged])
@@ -172,12 +174,12 @@ with tf.Graph().as_default():
     feed_dict = {
       siameseModel.input_x1: x1_batch if random_value > 0.5 else x2_batch,
       siameseModel.input_x2: x2_batch if random_value > 0.5 else x1_batch,
-      siameseModel.input_y: y_batch,
+      siameseModel.input_y_norm: map(lambda x: x / FLAGS.training_y_scale, y_batch),
       siameseModel.side1_dropout: FLAGS.side1_dropout,
       siameseModel.side2_dropout: FLAGS.side2_dropout,
     }
 
-    _, step, loss, accuracy, dist, sim, summaries = sess.run([train_op_set, global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.distance, siameseModel.temp_sim, train_summary_op], feed_dict)
+    _, step, loss, accuracy, dist, sim, summaries = sess.run([train_op_set, global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.distance, siameseModel.pred_gs, train_summary_op], feed_dict)
     time_str = datetime.datetime.now().isoformat()
     if i % 100 == 0:
       print("TRAIN {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
@@ -188,12 +190,12 @@ with tf.Graph().as_default():
     feed_dict = {
       siameseModel.input_x1: x1_batch if random_value > 0.5 else x2_batch,
       siameseModel.input_x2: x2_batch if random_value > 0.5 else x1_batch,
-      siameseModel.input_y: y_batch,
+      siameseModel.input_y_norm: map(lambda x: x / FLAGS.training_y_scale, y_batch),
       siameseModel.side1_dropout: 1.0,
       siameseModel.side2_dropout: 1.0,
     }
     
-    step, loss, accuracy, sim, summaries = sess.run([global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.temp_sim, dev_summary_op], feed_dict)
+    step, loss, accuracy, sim, summaries = sess.run([global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.pred_gs, dev_summary_op], feed_dict)
     time_str = datetime.datetime.now().isoformat()
     if i % 100 == 0:
       print("DEV {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))

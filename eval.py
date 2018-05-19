@@ -14,6 +14,8 @@ from input_helpers import InputHelper
 # Eval Parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_string("eval_filepath", "validation.txt0", "Evaluate on this data (Default: None)")
+tf.flags.DEFINE_integer("eval_y_position", 1, "position of y in evaluation file (default: 1)")
+tf.flags.DEFINE_float("eval_y_scale", 5.0, "scale of y in evaluation file (default: 5.0)")
 tf.flags.DEFINE_string("vocab_filepath", "runs/1526593435/checkpoints/vocab", "Load training time vocabulary (Default: None)")
 tf.flags.DEFINE_string("model", "runs/1512222837/checkpoints/model-5000", "Load trained model checkpoint (Default: None)")
 
@@ -33,7 +35,7 @@ if FLAGS.eval_filepath==None or FLAGS.vocab_filepath==None or FLAGS.model==None 
 
 # load data and map id-transform based on training time vocabulary
 inpH = InputHelper()
-x1_test, x2_test, y_test = inpH.getTestDataSet(FLAGS.eval_filepath, FLAGS.vocab_filepath, 30)
+x1_test, x2_test, y_test = inpH.getTestDataSet(FLAGS.eval_filepath, FLAGS.eval_y_position, FLAGS.vocab_filepath, 30)
 
 # Evaluation
 # ==================================================
@@ -53,7 +55,7 @@ with graph.as_default():
     # Get the placeholders from the graph by name
     input_x1 = graph.get_operation_by_name("input_x1").outputs[0]
     input_x2 = graph.get_operation_by_name("input_x2").outputs[0]
-    input_y = graph.get_operation_by_name("input_y").outputs[0]
+    input_y_norm = graph.get_operation_by_name("input_y_norm").outputs[0]
 
     side1_dropout = graph.get_operation_by_name("side1_dropout").outputs[0]
     side2_dropout = graph.get_operation_by_name("side2_dropout").outputs[0]
@@ -77,7 +79,7 @@ with graph.as_default():
       x1_dev_b, x2_dev_b, y_dev_b = zip(*db)
       batch_predictions, batch_acc, batch_sim = sess.run(
         [ predictions, accuracy,sim ],
-        { input_x1: x1_dev_b, input_x2: x2_dev_b, input_y: y_dev_b, side1_dropout: 1.0, side2_dropout: 1.0 })
+        { input_x1: x1_dev_b, input_x2: x2_dev_b, input_y_norm: map(lambda x: x / FLAGS.eval_y_scale, y_dev_b), side1_dropout: 1.0, side2_dropout: 1.0 })
       all_predictions = np.concatenate([all_predictions, batch_predictions])
       all_d = np.concatenate([all_d, batch_sim])
       print("DEV ACC {}".format(batch_acc))

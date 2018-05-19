@@ -54,43 +54,30 @@ class InputHelper(object):
       self.pre_emb = Word2Vec.load_word2vec_format(emb_path, binary=True)
       self.pre_emb.init_sims(replace=True)
       num_keys = len(self.pre_emb.vocab)
-    print("Loaded word2vec of length: {}." % num_keys)
+    print("Loaded word2vec of length: %s." % num_keys)
     gc.collect()
 
   def deletePreEmb(self):
     self.pre_emb = dict()
     gc.collect()
 
-  def getTsvData(self, filepath):
+  def loadTSV(self, filepath, y_position):
     x1 = []
     x2 = []
     y = []
-    # positive samples from file
-    for line in open(filepath):
-      l = line.strip().split("\t")
-      if len(l) < 2:
-        continue
-      if random() > 0.5:
-        x1.append(l[0].lower())
-        x2.append(l[1].lower())
-      else:
-        x1.append(l[1].lower())
-        x2.append(l[0].lower())
-      y.append(int(l[2]))
-    return np.asarray(x1), np.asarray(x2), np.asarray(y)
+    x1_x2_position = [0, 1, 2]
+    x1_x2_position.remove(y_position)
 
-  def getTsvTestData(self, filepath):
-    x1 = []
-    x2 = []
-    y = []
-    # positive samples from file
     for line in open(filepath):
       l = line.strip().split("\t")
       if len(l) < 3:
         continue
-      x1.append(l[1].lower())
-      x2.append(l[2].lower())
-      y.append(int(l[0]))  # np.array([0,1]))
+
+      random_result = random() > 0.5
+      x1.append(l[x1_x2_position[0 if random_result else 1]].lower())
+      x2.append(l[x1_x2_position[1 if random_result else 0]].lower())
+      y.append(float(l[y_position]))
+
     return np.asarray(x1), np.asarray(x2), np.asarray(y)
 
   def batch_iter(self, data, batch_size, num_epochs, shuffle=True):
@@ -128,8 +115,8 @@ class InputHelper(object):
 
   # Data Preparatopn
   # ==================================================
-  def getDataSets(self, training_paths, max_document_length, percent_dev, batch_size):
-    x1_text, x2_text, y = self.getTsvData(training_paths)
+  def getDataSets(self, training_path, training_y_position, max_document_length, percent_dev, batch_size):
+    x1_text, x2_text, y = self.loadTSV(training_path, training_y_position)
 
     # Build vocabulary
     vocab_processor = MyVocabularyProcessor(max_document_length, min_frequency=0, is_char_based=False)
@@ -155,16 +142,15 @@ class InputHelper(object):
     x1_train, x1_dev = x1_shuffled[:dev_idx], x1_shuffled[dev_idx:]
     x2_train, x2_dev = x2_shuffled[:dev_idx], x2_shuffled[dev_idx:]
     y_train, y_dev = y_shuffled[:dev_idx], y_shuffled[dev_idx:]
-    print("Train/Dev split for {}: {:d}/{:d}".format(training_paths,
-                                                     len(y_train), len(y_dev)))
-    sum_no_of_batches = sum_no_of_batches+(len(y_train)//batch_size)
+    print("Train/Dev split for {}: {:d}/{:d}".format(training_path, len(y_train), len(y_dev)))
+    sum_no_of_batches = sum_no_of_batches + (len(y_train)//batch_size)
     train_set = (x1_train, x2_train, y_train)
     dev_set = (x1_dev, x2_dev, y_dev)
     gc.collect()
     return train_set, dev_set, vocab_processor, sum_no_of_batches
 
-  def getTestDataSet(self, data_path, vocab_path, max_document_length):
-    x1_temp, x2_temp, y = self.getTsvTestData(data_path)
+  def getTestDataSet(self, data_path, data_y_position, vocab_path, max_document_length):
+    x1_temp, x2_temp, y = self.loadTSV(data_path, data_y_position)
 
     # Build vocabulary
     vocab_processor = MyVocabularyProcessor(max_document_length, min_frequency=0)
