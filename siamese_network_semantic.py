@@ -69,13 +69,31 @@ class SiameseLSTMw2v(object):
           tf.sqrt(tf.reduce_sum(tf.square(self.out2), 1, keep_dims=True))))
 
       self.distance = tf.reshape(self.distance, [-1], name="distance")
+      self.output_y_norm = tf.subtract(tf.ones_like(self.distance), self.distance)
 
     with tf.name_scope("loss"):
       self.loss = self.contrastive_loss(self.input_y_norm, self.distance, batch_size)
 
     with tf.name_scope("accuracy_gs"):
-      self.pred_gs = tf.rint(tf.scalar_mul(5.0, tf.subtract(tf.ones_like(self.distance), self.distance)), name="pred_gs")
+      self.pred_gs = tf.rint(tf.scalar_mul(5.0, self.output_y_norm), name="pred_gs")
       y_gs = tf.rint(tf.scalar_mul(5.0, self.input_y_norm))
       correct_predictions = tf.equal(self.pred_gs, y_gs)
       self.accuracy=tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy_gs")
-      
+
+    with tf.name_scope("pcc"):
+      input_y_norm_minus_mean = tf.subtract(self.input_y_norm, tf.reduce_mean(self.input_y_norm))
+      output_y_norm_minus_mean = tf.subtract(self.output_y_norm, tf.reduce_mean(self.output_y_norm))
+
+      numerator = tf.reduce_sum(tf.multiply(input_y_norm_minus_mean, output_y_norm_minus_mean))
+      denominator = tf.multiply(
+        tf.sqrt(tf.reduce_sum(tf.square(input_y_norm_minus_mean))),
+        tf.sqrt(tf.reduce_sum(tf.square(output_y_norm_minus_mean))))
+
+      self.pcc = tf.divide(numerator, denominator)
+
+    with tf.name_scope("rho"):
+      pass
+
+    with tf.name_scope("mse"):
+      # SUM_i((y_i-(1-d_i))^2)) i from 1 to n
+      self.mse = tf.reduce_sum(tf.square(tf.subtract(self.input_y_norm, self.output_y_norm)))

@@ -115,14 +115,16 @@ with tf.Graph().as_default():
   # Summaries for loss and accuracy
   loss_summary = tf.summary.scalar("loss", siameseModel.loss)
   acc_summary = tf.summary.scalar("accuracy_gs", siameseModel.accuracy)
+  pcc_summary = tf.summary.scalar("pcc", siameseModel.pcc)
+  mse_summary = tf.summary.scalar("mse", siameseModel.mse)
 
   # Train Summaries
-  train_summary_op = tf.summary.merge([loss_summary, acc_summary, grad_summaries_merged])
+  train_summary_op = tf.summary.merge([loss_summary, acc_summary, pcc_summary, mse_summary, grad_summaries_merged])
   train_summary_dir = os.path.join(out_dir, "summaries", "train")
   train_summary_writer = tf.summary.FileWriter(train_summary_dir, sess.graph)
 
   # Dev summaries
-  dev_summary_op = tf.summary.merge([loss_summary, acc_summary])
+  dev_summary_op = tf.summary.merge([loss_summary, acc_summary, pcc_summary, mse_summary])
   dev_summary_dir = os.path.join(out_dir, "summaries", "dev")
   dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, sess.graph)
 
@@ -179,10 +181,10 @@ with tf.Graph().as_default():
       siameseModel.side2_dropout: FLAGS.side2_dropout,
     }
 
-    _, step, loss, accuracy, dist, sim, summaries = sess.run([train_op_set, global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.distance, siameseModel.pred_gs, train_summary_op], feed_dict)
+    _, step, loss, accuracy, pcc, mse, dist, sim, summaries = sess.run([train_op_set, global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.pcc, siameseModel.mse, siameseModel.distance, siameseModel.pred_gs, train_summary_op], feed_dict)
     time_str = datetime.datetime.now().isoformat()
     if i % 100 == 0:
-      print("TRAIN {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
+      print("TRAIN {}: step {}, loss {:g}, acc {:g}, pcc: {:g}, mse: {:g}".format(time_str, step, loss, accuracy, pcc, mse))
     train_summary_writer.add_summary(summaries, step)
 
   def dev_step(x1_batch, x2_batch, y_batch, i):
@@ -195,10 +197,10 @@ with tf.Graph().as_default():
       siameseModel.side2_dropout: 1.0,
     }
     
-    step, loss, accuracy, sim, summaries = sess.run([global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.pred_gs, dev_summary_op], feed_dict)
+    step, loss, accuracy, pcc, mse, sim, summaries = sess.run([global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.pcc, siameseModel.mse, siameseModel.pred_gs, dev_summary_op], feed_dict)
     time_str = datetime.datetime.now().isoformat()
     if i % 100 == 0:
-      print("DEV {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
+      print("DEV {}: step {}, loss {:g}, acc {:g}, pcc {:g}, mse: {:g}".format(time_str, step, loss, accuracy, pcc, mse))
     dev_summary_writer.add_summary(summaries, step)
     return accuracy
 
