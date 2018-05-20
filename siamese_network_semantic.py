@@ -31,6 +31,17 @@ class SiameseLSTMw2v(object):
     #tmp= tf.mul(y,tf.square(d))
     tmp2 = (1 - y) * tf.square(tf.maximum((1 - d), 0))
     return tf.reduce_sum(tmp + tmp2) / batch_size / 2
+
+  def calculate_pcc(self, x, y, name=None):
+    x_minus_mean = tf.subtract(x, tf.reduce_mean(x))
+    y_minus_mean = tf.subtract(y, tf.reduce_mean(y))
+
+    numerator = tf.reduce_sum(tf.multiply(x_minus_mean, y_minus_mean))
+    denominator = tf.multiply(
+      tf.sqrt(tf.reduce_sum(tf.square(x_minus_mean))),
+      tf.sqrt(tf.reduce_sum(tf.square(y_minus_mean))))
+
+    return tf.divide(numerator, denominator, name=name)
   
   def __init__(
     self, sequence_length, vocab_size, embedding_size, batch_size, trainableEmbeddings, sides_out_units,
@@ -63,10 +74,10 @@ class SiameseLSTMw2v(object):
       # so here we compute distance: norm2(out1(i) - out2(i)) / (norm2(out1(i)) + norm2(out2(i)))
       # this can result in outputting a number between 0 and 1
       self.distance = tf.div(
-        tf.sqrt(tf.reduce_sum(tf.square(tf.subtract(self.out1, self.out2)), 1, keep_dims=True)),
+        tf.sqrt(tf.reduce_sum(tf.square(tf.subtract(self.out1, self.out2)), 1, keepdims=True)),
         tf.add(
-          tf.sqrt(tf.reduce_sum(tf.square(self.out1), 1, keep_dims=True)),
-          tf.sqrt(tf.reduce_sum(tf.square(self.out2), 1, keep_dims=True))))
+          tf.sqrt(tf.reduce_sum(tf.square(self.out1), 1, keepdims=True)),
+          tf.sqrt(tf.reduce_sum(tf.square(self.out2), 1, keepdims=True))))
 
       self.distance = tf.reshape(self.distance, [-1], name="distance")
       self.output_y_norm = tf.subtract(tf.ones_like(self.distance), self.distance)
@@ -74,26 +85,24 @@ class SiameseLSTMw2v(object):
     with tf.name_scope("loss"):
       self.loss = self.contrastive_loss(self.input_y_norm, self.distance, batch_size)
 
-    with tf.name_scope("accuracy_gs"):
-      self.pred_gs = tf.rint(tf.scalar_mul(5.0, self.output_y_norm), name="pred_gs")
-      y_gs = tf.rint(tf.scalar_mul(5.0, self.input_y_norm))
-      correct_predictions = tf.equal(self.pred_gs, y_gs)
-      self.accuracy=tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy_gs")
+    # Gold standard accuracy will not be used
+    # with tf.name_scope("accuracy_gs"):
+    #   pred_gs = tf.rint(tf.scalar_mul(5.0, self.output_y_norm))
+    #   y_gs = tf.rint(tf.scalar_mul(5.0, self.input_y_norm))
+    #   correct_predictions = tf.equal(pred_gs, y_gs)
+    #   self.accuracy=tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy_gs")
 
     with tf.name_scope("pcc"):
-      input_y_norm_minus_mean = tf.subtract(self.input_y_norm, tf.reduce_mean(self.input_y_norm))
-      output_y_norm_minus_mean = tf.subtract(self.output_y_norm, tf.reduce_mean(self.output_y_norm))
-
-      numerator = tf.reduce_sum(tf.multiply(input_y_norm_minus_mean, output_y_norm_minus_mean))
-      denominator = tf.multiply(
-        tf.sqrt(tf.reduce_sum(tf.square(input_y_norm_minus_mean))),
-        tf.sqrt(tf.reduce_sum(tf.square(output_y_norm_minus_mean))))
-
-      self.pcc = tf.divide(numerator, denominator)
+      self.pcc = self.calculate_pcc(self.input_y_norm, self.output_y_norm, name="pcc")
 
     with tf.name_scope("rho"):
-      pass
+      input_y_rank = tf.contrib.framework.argsort(self.input_y_norm)
+      output_y_rank = tf.contrib.framework.argsort(self.output_y_norm)
+      
+      self.rho = self.calculate_pcc(
+        tf.cast(input_y_rank, tf.float32),
+        tf.cast(output_y_rank, tf.float32), name="rho")
 
     with tf.name_scope("mse"):
       # SUM_i((y_i-(1-d_i))^2)) i from 1 to n
-      self.mse = tf.reduce_sum(tf.square(tf.subtract(self.input_y_norm, self.output_y_norm)))
+      self.mse = tf.reduce_sum(tf.square(tf.subtract(self.input_y_norm, self.output_y_norm)), name="mse")

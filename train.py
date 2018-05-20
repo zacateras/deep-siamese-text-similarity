@@ -6,6 +6,7 @@ import os
 import time
 import datetime
 import gc
+import sys
 from input_helpers import InputHelper
 from siamese_network_semantic import SiameseLSTMw2v
 from tensorflow.contrib import learn
@@ -14,9 +15,11 @@ from random import random
 
 # Parameters
 # ==================================================
-tf.flags.DEFINE_string("training_file", "data/train_snli.txt", "training file (default: None)")
-tf.flags.DEFINE_integer("training_y_position", 0, "position of y in training file (default: 0)")
-tf.flags.DEFINE_float("training_y_scale", 5.0, "scale of y in training file (default: 5.0)")
+tf.flags.DEFINE_string("training_filepath", "data/train_snli.txt", "training file path (default: None)")
+tf.flags.DEFINE_float("y_scale", 5.0, "scale of y in training file (default: 5.0)")
+tf.flags.DEFINE_integer("y_position", 0, "position of y in training file (default: 0)")
+tf.flags.DEFINE_integer("x1_position", 0, "position of x1 in training file (default: 1)")
+tf.flags.DEFINE_integer("x2_position", 0, "position of x2 in training file (default: 2)")
 
 # Embedding parameters
 tf.flags.DEFINE_string("word2vec_model", "wiki.simple.vec", "word2vec pre-trained embeddings file (default: None)")
@@ -43,19 +46,19 @@ tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device 
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
 
 FLAGS = tf.flags.FLAGS
-FLAGS._parse_flags()
+FLAGS(sys.argv)
 print("\nParameters:")
-for attr, value in sorted(FLAGS.__flags.items()):
-  print("{} = {}".format(attr.upper(), value))
+for attr, flag in sorted(FLAGS.__flags.items()):
+  print("{} = {}".format(attr.upper(), flag.value))
 
-if FLAGS.training_file==None:
-  print("Input File path is empty. use --training_file argument.")
+if FLAGS.training_filepath==None:
+  print("Input File path is empty. use --training_filepath argument.")
   exit()
 
 max_document_length=15
 inpH = InputHelper()
 train_set, dev_set, vocab_processor, sum_no_of_batches = inpH.getDataSets(
-  FLAGS.training_file, FLAGS.training_y_position, max_document_length, 10, FLAGS.batch_size)
+  FLAGS.training_filepath, FLAGS.y_position, FLAGS.x1_position, FLAGS.x2_position, max_document_length, 10, FLAGS.batch_size)
 
 trainableEmbeddings=False
 if FLAGS.word2vec_model==None:
@@ -112,19 +115,19 @@ with tf.Graph().as_default():
   out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs", timestamp))
   print("Writing to {}\n".format(out_dir))
 
-  # Summaries for loss and accuracy
+  # Summaries for loss pcc rho mse
   loss_summary = tf.summary.scalar("loss", siameseModel.loss)
-  acc_summary = tf.summary.scalar("accuracy_gs", siameseModel.accuracy)
   pcc_summary = tf.summary.scalar("pcc", siameseModel.pcc)
+  rho_summary = tf.summary.scalar("rho", siameseModel.rho)
   mse_summary = tf.summary.scalar("mse", siameseModel.mse)
 
   # Train Summaries
-  train_summary_op = tf.summary.merge([loss_summary, acc_summary, pcc_summary, mse_summary, grad_summaries_merged])
+  train_summary_op = tf.summary.merge([loss_summary, pcc_summary, rho_summary, mse_summary, grad_summaries_merged])
   train_summary_dir = os.path.join(out_dir, "summaries", "train")
   train_summary_writer = tf.summary.FileWriter(train_summary_dir, sess.graph)
 
   # Dev summaries
-  dev_summary_op = tf.summary.merge([loss_summary, acc_summary, pcc_summary, mse_summary])
+  dev_summary_op = tf.summary.merge([loss_summary, pcc_summary, rho_summary, mse_summary])
   dev_summary_dir = os.path.join(out_dir, "summaries", "dev")
   dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, sess.graph)
 
@@ -176,15 +179,15 @@ with tf.Graph().as_default():
     feed_dict = {
       siameseModel.input_x1: x1_batch if random_value > 0.5 else x2_batch,
       siameseModel.input_x2: x2_batch if random_value > 0.5 else x1_batch,
-      siameseModel.input_y_norm: map(lambda x: x / FLAGS.training_y_scale, y_batch),
+      siameseModel.input_y_norm: map(lambda x: x / FLAGS.y_scale, y_batch),
       siameseModel.side1_dropout: FLAGS.side1_dropout,
       siameseModel.side2_dropout: FLAGS.side2_dropout,
     }
 
-    _, step, loss, accuracy, pcc, mse, dist, sim, summaries = sess.run([train_op_set, global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.pcc, siameseModel.mse, siameseModel.distance, siameseModel.pred_gs, train_summary_op], feed_dict)
+    _, step, loss, pcc, rho, mse, dist, summaries = sess.run([train_op_set, global_step, siameseModel.loss, siameseModel.pcc, siameseModel.rho, siameseModel.mse, siameseModel.distance, train_summary_op], feed_dict)
     time_str = datetime.datetime.now().isoformat()
     if i % 100 == 0:
-      print("TRAIN {}: step {}, loss {:g}, acc {:g}, pcc: {:g}, mse: {:g}".format(time_str, step, loss, accuracy, pcc, mse))
+      print("TRAIN {}: step {}, loss {}, pcc: {}, rho: {}, mse: {}".format(time_str, step, loss, pcc, rho, mse))
     train_summary_writer.add_summary(summaries, step)
 
   def dev_step(x1_batch, x2_batch, y_batch, i):
@@ -192,21 +195,21 @@ with tf.Graph().as_default():
     feed_dict = {
       siameseModel.input_x1: x1_batch if random_value > 0.5 else x2_batch,
       siameseModel.input_x2: x2_batch if random_value > 0.5 else x1_batch,
-      siameseModel.input_y_norm: map(lambda x: x / FLAGS.training_y_scale, y_batch),
+      siameseModel.input_y_norm: map(lambda x: x / FLAGS.y_scale, y_batch),
       siameseModel.side1_dropout: 1.0,
       siameseModel.side2_dropout: 1.0,
     }
     
-    step, loss, accuracy, pcc, mse, sim, summaries = sess.run([global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.pcc, siameseModel.mse, siameseModel.pred_gs, dev_summary_op], feed_dict)
+    step, loss, pcc, rho, mse, summaries = sess.run([global_step, siameseModel.loss, siameseModel.pcc, siameseModel.rho, siameseModel.mse, dev_summary_op], feed_dict)
     time_str = datetime.datetime.now().isoformat()
     if i % 100 == 0:
-      print("DEV {}: step {}, loss {:g}, acc {:g}, pcc {:g}, mse: {:g}".format(time_str, step, loss, accuracy, pcc, mse))
+      print("DEV {}: step {}, loss {}, rho {}, pcc {}, mse: {}".format(time_str, step, loss, pcc, rho, mse))
     dev_summary_writer.add_summary(summaries, step)
-    return accuracy
+    return mse
 
   # Generate batches
   batches = inpH.batch_iter(list(zip(train_set[0], train_set[1], train_set[2])), FLAGS.batch_size, FLAGS.num_epochs)
-  max_validation_acc=0.0
+  max_validation_mse=0.0
 
   for nn in xrange(sum_no_of_batches * FLAGS.num_epochs):
     batch = batches.next()
@@ -218,7 +221,7 @@ with tf.Graph().as_default():
     train_step(x1_batch, x2_batch, y_batch, nn)
     step = tf.train.global_step(sess, global_step)
 
-    current_evaluation_total_acc = 0.0
+    current_evaluation_total_mse = 0.0
 
     if step % FLAGS.evaluate_every == 0:
       print("\nEvaluation:")
@@ -230,11 +233,11 @@ with tf.Graph().as_default():
         x1_dev_b, x2_dev_b, y_dev_b = zip(*db)
         if len(y_dev_b)<1:
           continue
-        current_evaluation_total_acc = current_evaluation_total_acc + dev_step(x1_dev_b, x2_dev_b, y_dev_b, i)
+        current_evaluation_total_mse = current_evaluation_total_mse + dev_step(x1_dev_b, x2_dev_b, y_dev_b, i)
         i = i + 1
 
-    if step % FLAGS.checkpoint_every == 0 and current_evaluation_total_acc >= max_validation_acc:
-      max_validation_acc = current_evaluation_total_acc
+    if step % FLAGS.checkpoint_every == 0 and current_evaluation_total_mse >= max_validation_mse:
+      max_validation_mse = current_evaluation_total_mse
       saver.save(sess, checkpoint_prefix, global_step=step)
       tf.train.write_graph(sess.graph.as_graph_def(), checkpoint_prefix, "graph"+str(nn)+".pb", as_text=False)
-      print("Saved model {} with sum_accuracy={} checkpoint to {}\n".format(nn, max_validation_acc, checkpoint_prefix))
+      print("Saved model {} with sum_mse={} checkpoint to {}\n".format(nn, max_validation_mse, checkpoint_prefix))

@@ -61,12 +61,10 @@ class InputHelper(object):
     self.pre_emb = dict()
     gc.collect()
 
-  def loadTSV(self, filepath, y_position):
+  def loadTSV(self, filepath, y_position=0, x1_position=1, x2_position=2):
     x1 = []
     x2 = []
     y = []
-    x1_x2_position = [0, 1, 2]
-    x1_x2_position.remove(y_position)
 
     for line in open(filepath):
       l = line.strip().split("\t")
@@ -74,8 +72,8 @@ class InputHelper(object):
         continue
 
       random_result = random() > 0.5
-      x1.append(l[x1_x2_position[0 if random_result else 1]].lower())
-      x2.append(l[x1_x2_position[1 if random_result else 0]].lower())
+      x1.append(l[x1_position if random_result else x2_position].lower())
+      x2.append(l[x2_position if random_result else x1_position].lower())
       y.append(float(l[y_position]))
 
     return np.asarray(x1), np.asarray(x2), np.asarray(y)
@@ -115,8 +113,8 @@ class InputHelper(object):
 
   # Data Preparatopn
   # ==================================================
-  def getDataSets(self, training_path, training_y_position, max_document_length, percent_dev, batch_size):
-    x1_text, x2_text, y = self.loadTSV(training_path, training_y_position)
+  def getDataSets(self, path, y_position, x1_position, x2_position, max_document_length, percent_dev, batch_size):
+    x1_text, x2_text, y = self.loadTSV(path, y_position, x1_position, x2_position)
 
     # Build vocabulary
     vocab_processor = MyVocabularyProcessor(max_document_length, min_frequency=0, is_char_based=False)
@@ -142,15 +140,15 @@ class InputHelper(object):
     x1_train, x1_dev = x1_shuffled[:dev_idx], x1_shuffled[dev_idx:]
     x2_train, x2_dev = x2_shuffled[:dev_idx], x2_shuffled[dev_idx:]
     y_train, y_dev = y_shuffled[:dev_idx], y_shuffled[dev_idx:]
-    print("Train/Dev split for {}: {:d}/{:d}".format(training_path, len(y_train), len(y_dev)))
+    print("Train/Dev split for {}: {:d}/{:d}".format(path, len(y_train), len(y_dev)))
     sum_no_of_batches = sum_no_of_batches + (len(y_train)//batch_size)
     train_set = (x1_train, x2_train, y_train)
     dev_set = (x1_dev, x2_dev, y_dev)
     gc.collect()
     return train_set, dev_set, vocab_processor, sum_no_of_batches
 
-  def getTestDataSet(self, data_path, data_y_position, vocab_path, max_document_length):
-    x1_temp, x2_temp, y = self.loadTSV(data_path, data_y_position)
+  def getTestDataSet(self, path, y_position, x1_position, x2_position, vocab_path, max_document_length):
+    x1_temp, x2_temp, y = self.loadTSV(path, y_position, x1_position, x2_position)
 
     # Build vocabulary
     vocab_processor = MyVocabularyProcessor(max_document_length, min_frequency=0)
