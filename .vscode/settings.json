@@ -1,3 +1,6 @@
 {
-    "python.pythonPath": "${env:PYTHONPATH}/venv/bin/python"
+    "python.pythonPath": "${workspaceRoot}/venv/bin/python",
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true,
+    "python.linting.flake8Enabled": false
 }
