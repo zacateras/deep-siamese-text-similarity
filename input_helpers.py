@@ -94,23 +94,6 @@ class InputHelper(object):
         end_index = min((batch_num + 1) * batch_size, data_size)
         yield shuffled_data[start_index:end_index]
 
-  def dumpValidation(self, x1_text, x2_text, y, shuffled_index, dev_idx, i):
-    print("dumping validation "+str(i))
-    x1_shuffled = x1_text[shuffled_index]
-    x2_shuffled = x2_text[shuffled_index]
-    y_shuffled = y[shuffled_index]
-    x1_dev = x1_shuffled[dev_idx:]
-    x2_dev = x2_shuffled[dev_idx:]
-    y_dev = y_shuffled[dev_idx:]
-    del x1_shuffled
-    del y_shuffled
-    with open('validation.txt'+str(i), 'w') as f:
-      for text1, text2, label in zip(x1_dev, x2_dev, y_dev):
-        f.write(str(label)+"\t"+text1+"\t"+text2+"\n")
-      f.close()
-    del x1_dev
-    del y_dev
-
   # Data Preparatopn
   # ==================================================
   def getDataSets(self, path, y_position, x1_position, x2_position, max_document_length, percent_dev, batch_size):
@@ -135,8 +118,6 @@ class InputHelper(object):
     del x1
     del x2
     # Split train/test set
-    self.dumpValidation(x1_text, x2_text, y, shuffle_indices, dev_idx, 0)
-    # TODO: This is very crude, should use cross-validation
     x1_train, x1_dev = x1_shuffled[:dev_idx], x1_shuffled[dev_idx:]
     x2_train, x2_dev = x2_shuffled[:dev_idx], x2_shuffled[dev_idx:]
     y_train, y_dev = y_shuffled[:dev_idx], y_shuffled[dev_idx:]

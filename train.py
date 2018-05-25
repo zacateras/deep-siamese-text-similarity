@@ -16,6 +16,7 @@ from random import random
 # Parameters
 # ==================================================
 tf.flags.DEFINE_string("training_filepath", "data/train_snli.txt", "training file path (default: None)")
+tf.flags.DEFINE_string("output_dirpath", None, "output directory path (default: None)")
 tf.flags.DEFINE_float("y_scale", 5.0, "scale of y in training file (default: 5.0)")
 tf.flags.DEFINE_integer("y_position", 0, "position of y in training file (default: 0)")
 tf.flags.DEFINE_integer("x1_position", 0, "position of x1 in training file (default: 1)")
@@ -112,7 +113,7 @@ with tf.Graph().as_default():
 
   # Output directory for models and summaries
   timestamp = str(int(time.time()))
-  out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs", timestamp))
+  out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs", timestamp)) if FLAGS.output_dirpath is None else os.path.abspath(FLAGS.output_dirpath)
   print("Writing to {}\n".format(out_dir))
 
   # Summaries for loss pcc rho mse
