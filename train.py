@@ -28,13 +28,11 @@ tf.flags.DEFINE_string("word2vec_format", "text", "word2vec pre-trained embeddin
 tf.flags.DEFINE_integer("embedding_dim", 300, "Dimensionality of character embedding (default: 300)")
 
 # RNN stack parameters
+tf.flags.DEFINE_boolean("tied", True, "Different side weights are tied / untied (default: True)")
 tf.flags.DEFINE_float("side1_dropout", 1.0, "Dropout keep probability (default: 1.0)")
 tf.flags.DEFINE_float("side2_dropout", 1.0, "Dropout keep probability (default: 1.0)")
-tf.flags.DEFINE_integer("side1_layers", 3, "Number of LSTM layers for Side_1 (default: 3)")
-tf.flags.DEFINE_integer("side2_layers", 3, "Number of LSTM layers for Side_2 (default: 3)")
-tf.flags.DEFINE_integer("sides_out_units", 50, "Number of out units for both Sides (default:50)")
-tf.flags.DEFINE_integer("side1_hidden_units", 50, "Number of hidden units for Side_1 (default:50)")
-tf.flags.DEFINE_integer("side2_hidden_units", 50, "Number of hidden units for Side_2 (default:50)")
+tf.flags.DEFINE_list("side1_nodes", [50, 50, 50], "Number of nodes in layers for Side_1 (default:50,50,50)")
+tf.flags.DEFINE_list("side2_nodes", [50, 50, 50], "Number of nodes in layers for Side_2 (default:50,50,50)")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
@@ -88,11 +86,9 @@ with tf.Graph().as_default():
       embedding_size=FLAGS.embedding_dim,
       batch_size=FLAGS.batch_size,
       trainableEmbeddings=trainableEmbeddings,
-      side1_layers=FLAGS.side1_layers,
-      side2_layers=FLAGS.side2_layers,
-      sides_out_units=FLAGS.sides_out_units,
-      side1_hidden_units=FLAGS.side1_hidden_units,
-      side2_hidden_units=FLAGS.side2_hidden_units
+      tied=FLAGS.tied,
+      side1_nodes=FLAGS.side1_nodes,
+      side2_nodes=FLAGS.side2_nodes,
     )
     
     global_step = tf.Variable(0, name="global_step", trainable=False)
