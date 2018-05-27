@@ -10,19 +10,17 @@ class SiameseLSTMw2v(object):
   def stackedRNN(self, x, dropout, scope, embedding_size, nodes):
     # Prepare data shape to match `static_rnn` function requirements
     x = tf.unstack(tf.transpose(x, perm=[1, 0, 2]))
-    
-    # Define lstm cells with tensorflow
-    # Forward direction cell
 
-    with tf.name_scope("fw" + scope), tf.variable_scope("fw" + scope, reuse=tf.AUTO_REUSE):
-      stacked_rnn_fw = []
+    with tf.name_scope(scope), tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+      stacked_rnn = []
+      
       for n in nodes:
-        fw_cell = tf.nn.rnn_cell.BasicLSTMCell(int(n), forget_bias=1.0, state_is_tuple=True)
-        lstm_fw_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=dropout)
-        stacked_rnn_fw.append(lstm_fw_cell)
-      lstm_fw_cell_m = tf.nn.rnn_cell.MultiRNNCell(cells=stacked_rnn_fw, state_is_tuple=True)
+        lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(int(n), name=('lstm_cell_%s' % n))
+        lstm_cell_dropout = tf.contrib.rnn.DropoutWrapper(lstm_cell, output_keep_prob=dropout)
+        stacked_rnn.append(lstm_cell_dropout)
 
-      outputs, _ = tf.nn.static_rnn(lstm_fw_cell_m, x, dtype=tf.float32)
+      lstm_cell_m = tf.nn.rnn_cell.MultiRNNCell(stacked_rnn)
+      outputs, _ = tf.nn.static_rnn(lstm_cell_m, x, dtype=tf.float32)
     return outputs[-1]
 
   def contrastive_loss(self, y, d, batch_size):
@@ -57,7 +55,7 @@ class SiameseLSTMw2v(object):
   
   def __init__(
     self, sequence_length, vocab_size, embedding_size, batch_size, trainableEmbeddings, tied, side1_nodes, side2_nodes):
-
+    
     # Placeholders for input, output
     self.input_x1 = tf.placeholder(tf.int32, [None, sequence_length], name="input_x1")
     self.input_x2 = tf.placeholder(tf.int32, [None, sequence_length], name="input_x2")
@@ -77,14 +75,17 @@ class SiameseLSTMw2v(object):
 
     # Create a convolution + maxpool layer for each filter size
     with tf.name_scope("output"):
-      self.out1 = self.stackedRNN(self.embedded_words1, self.side1_dropout, "side" if tied else "side_1", embedding_size, side1_nodes)
-      self.out2 = self.stackedRNN(self.embedded_words2, self.side2_dropout, "side" if tied else "side_2", embedding_size, side2_nodes)
+      self.out1 = self.stackedRNN(self.embedded_words1, self.side1_dropout, "shared" if tied else "side_1", embedding_size, side1_nodes)
+      self.out2 = self.stackedRNN(self.embedded_words2, self.side2_dropout, "shared" if tied else "side_2", embedding_size, side2_nodes)
 
       # out1 and out2 are lists of vectors outputted by stacked LSTMs for each input pair of sentences (i)
       # so here we compute distance: norm2(out1(i) - out2(i)) / (norm2(out1(i)) + norm2(out2(i)))
       # this can result in outputting a number between 0 and 1
+      #
+      # NOTE: out1 - out2 can often be 0, the framework have troubles with computing gradients for 0 = sqrt(0) (identity)
+      #       thus 1e-16 is added here as minimal total distance between out1 and out2
       self.distance = tf.div(
-        tf.sqrt(tf.reduce_sum(tf.square(tf.subtract(self.out1, self.out2)), 1, keepdims=True)),
+        tf.sqrt(tf.add(tf.reduce_sum(tf.square(tf.subtract(self.out1, self.out2)), 1, keepdims=True), 1e-16)),
         tf.add(
           tf.sqrt(tf.reduce_sum(tf.square(self.out1), 1, keepdims=True)),
           tf.sqrt(tf.reduce_sum(tf.square(self.out2), 1, keepdims=True))))

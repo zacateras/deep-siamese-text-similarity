@@ -22,6 +22,7 @@ tf.flags.DEFINE_float("y_scale", 5.0, "scale of y in training file (default: 5.0
 tf.flags.DEFINE_integer("y_position", 0, "position of y in training file (default: 0)")
 tf.flags.DEFINE_integer("x1_position", 0, "position of x1 in training file (default: 1)")
 tf.flags.DEFINE_integer("x2_position", 0, "position of x2 in training file (default: 2)")
+tf.flags.DEFINE_boolean("header", False, "if training file has a header (default: False)")
 
 # Embedding parameters
 tf.flags.DEFINE_string("word2vec_model", "wiki.simple.vec", "word2vec pre-trained embeddings file (default: None)")
@@ -60,7 +61,7 @@ if FLAGS.training_filepath==None:
 max_document_length=15
 inpH = InputHelper()
 train_set, dev_set, vocab_processor, sum_no_of_batches = inpH.getDataSets(
-  FLAGS.training_filepath, FLAGS.y_position, FLAGS.x1_position, FLAGS.x2_position, max_document_length, 10, FLAGS.batch_size)
+  FLAGS.training_filepath, FLAGS.y_position, FLAGS.x1_position, FLAGS.x2_position, FLAGS.header, max_document_length, 10, FLAGS.batch_size)
 
 trainableEmbeddings=False
 if FLAGS.word2vec_model==None:
@@ -210,7 +211,7 @@ with tf.Graph().as_default():
 
   # Generate batches
   batches = inpH.batch_iter(list(zip(train_set[0], train_set[1], train_set[2])), FLAGS.batch_size, FLAGS.num_epochs)
-  max_validation_mse=0.0
+  max_validation_mse=1e256
 
   n_iterations = sum_no_of_batches * FLAGS.num_epochs
   n_iterations = n_iterations if n_iterations < FLAGS.max_iterations else FLAGS.max_iterations
@@ -229,7 +230,6 @@ with tf.Graph().as_default():
     current_evaluation_total_mse = 0.0
 
     if step % FLAGS.evaluate_every == 0:
-      print("\nEvaluation:")
       dev_batches = inpH.batch_iter(list(zip(dev_set[0], dev_set[1], dev_set[2])), FLAGS.batch_size, 1)
       i = 0
       for db in dev_batches:
@@ -240,9 +240,9 @@ with tf.Graph().as_default():
           continue
         current_evaluation_total_mse = current_evaluation_total_mse + dev_step(x1_dev_b, x2_dev_b, y_dev_b, i)
         i = i + 1
-
-    if step % FLAGS.checkpoint_every == 0 and current_evaluation_total_mse >= max_validation_mse:
-      max_validation_mse = current_evaluation_total_mse
-      saver.save(sess, checkpoint_prefix, global_step=step)
-      tf.train.write_graph(sess.graph.as_graph_def(), checkpoint_prefix, "graph"+str(nn)+".pb", as_text=False)
-      print("Saved model {} with sum_mse={} checkpoint to {}\n".format(nn, max_validation_mse, checkpoint_prefix))
+    
+      if current_evaluation_total_mse <= max_validation_mse:
+        max_validation_mse = current_evaluation_total_mse
+        saver.save(sess, checkpoint_prefix, global_step=step)
+        tf.train.write_graph(sess.graph.as_graph_def(), checkpoint_prefix, "graph"+str(nn)+".pb", as_text=False)
+        print("Saved model {} with total_mse={} checkpoint to {}.".format(nn, max_validation_mse, checkpoint_prefix))

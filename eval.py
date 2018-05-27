@@ -18,6 +18,7 @@ tf.flags.DEFINE_float("y_scale", 5.0, "scale of y in evaluation file (default: 5
 tf.flags.DEFINE_integer("y_position", 0, "position of y in evaluation file (default: 0)")
 tf.flags.DEFINE_integer("x1_position", 1, "position of x1 in training file (default: 1)")
 tf.flags.DEFINE_integer("x2_position", 2, "position of x2 in training file (default: 2)")
+tf.flags.DEFINE_boolean("header", False, "if training file has a header (default: False)")
 
 # Eval Parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
@@ -42,7 +43,7 @@ if FLAGS.eval_filepath==None or FLAGS.vocab_filepath==None or FLAGS.model==None:
 # load data and map id-transform based on training time vocabulary
 inpH = InputHelper()
 x1_test, x2_test, y_test = inpH.getTestDataSet(
-  FLAGS.eval_filepath, FLAGS.y_position, FLAGS.x1_position, FLAGS.x2_position, FLAGS.vocab_filepath, 30)
+  FLAGS.eval_filepath, FLAGS.y_position, FLAGS.x1_position, FLAGS.x2_position, FLAGS.header, FLAGS.vocab_filepath, 30)
 
 # Evaluation
 # ==================================================

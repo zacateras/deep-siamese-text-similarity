@@ -59,20 +59,29 @@ class InputHelper(object):
     self.pre_emb = dict()
     gc.collect()
 
-  def loadTSV(self, filepath, y_position=0, x1_position=1, x2_position=2):
+  def loadTSV(self, filepath, y_position=0, x1_position=1, x2_position=2, header=False):
     x1 = []
     x2 = []
     y = []
 
     for line in open(filepath):
+      # skip header
+      if header:
+        header = False
+        continue
+
       l = line.strip().split("\t")
       if len(l) < 3:
+        continue
+
+      y_text = l[y_position]
+      if y_text is None or y_text == '': # skip lines for which y is not defined
         continue
 
       random_result = random() > 0.5
       x1.append(l[x1_position if random_result else x2_position].lower())
       x2.append(l[x2_position if random_result else x1_position].lower())
-      y.append(float(l[y_position]))
+      y.append(float(y_text))
 
     return np.asarray(x1), np.asarray(x2), np.asarray(y)
 
@@ -94,8 +103,8 @@ class InputHelper(object):
 
   # Data Preparatopn
   # ==================================================
-  def getDataSets(self, path, y_position, x1_position, x2_position, max_document_length, percent_dev, batch_size):
-    x1_text, x2_text, y = self.loadTSV(path, y_position, x1_position, x2_position)
+  def getDataSets(self, path, y_position, x1_position, x2_position, header, max_document_length, percent_dev, batch_size):
+    x1_text, x2_text, y = self.loadTSV(path, y_position, x1_position, x2_position, header)
 
     # Build vocabulary
     vocab_processor = MyVocabularyProcessor(max_document_length, min_frequency=0, is_char_based=False)
@@ -125,8 +134,8 @@ class InputHelper(object):
     gc.collect()
     return train_set, dev_set, vocab_processor, sum_no_of_batches
 
-  def getTestDataSet(self, path, y_position, x1_position, x2_position, vocab_path, max_document_length):
-    x1_temp, x2_temp, y = self.loadTSV(path, y_position, x1_position, x2_position)
+  def getTestDataSet(self, path, y_position, x1_position, x2_position, header, vocab_path, max_document_length):
+    x1_temp, x2_temp, y = self.loadTSV(path, y_position, x1_position, x2_position, header)
 
     # Build vocabulary
     vocab_processor = MyVocabularyProcessor(max_document_length, min_frequency=0)
