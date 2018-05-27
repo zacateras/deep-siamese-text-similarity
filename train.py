@@ -7,6 +7,7 @@ import time
 import datetime
 import gc
 import sys
+import shutil
 from input_helpers import InputHelper
 from siamese_network_semantic import SiameseLSTMw2v
 from tensorflow.contrib import learn
@@ -37,6 +38,7 @@ tf.flags.DEFINE_list("side2_nodes", [50, 50, 50], "Number of nodes in layers for
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_integer("num_epochs", 300, "Number of training epochs (default: 200)")
+tf.flags.DEFINE_integer("max_iterations", 500000, "Maximum number of iterations")
 tf.flags.DEFINE_integer("evaluate_every", 1000, "Evaluate model on dev set after this many steps (default: 100)")
 tf.flags.DEFINE_integer("checkpoint_every", 1000, "Save model after this many steps (default: 100)")
 
@@ -46,7 +48,8 @@ tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on 
 
 FLAGS = tf.flags.FLAGS
 FLAGS(sys.argv)
-print("\nParameters:")
+
+print("EXECUTION PARAMETERS:")
 for attr, flag in sorted(FLAGS.__flags.items()):
   print("{} = {}".format(attr.upper(), flag.value))
 
@@ -108,9 +111,12 @@ with tf.Graph().as_default():
   grad_summaries_merged = tf.summary.merge(grad_summaries)
 
   # Output directory for models and summaries
-  timestamp = str(int(time.time()))
-  out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs", timestamp)) if FLAGS.output_dirpath is None else os.path.abspath(FLAGS.output_dirpath)
-  print("Writing to {}\n".format(out_dir))
+  out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs", str(int(time.time())))) \
+            if FLAGS.output_dirpath is None else \
+            os.path.abspath(FLAGS.output_dirpath)
+  if os.path.exists(out_dir):
+    shutil.rmtree(out_dir)
+  print("Writing to %s." % out_dir)
 
   # Summaries for loss pcc rho mse
   loss_summary = tf.summary.scalar("loss", siameseModel.loss)
@@ -151,7 +157,6 @@ with tf.Graph().as_default():
     #initW = np.zeros(shape=(len(vocab_processor.vocabulary_), FLAGS.embedding_dim))
 
     # load any vectors from the word2vec
-    print("initializing initW with pre-trained word2vec embeddings")
     for w in vocab_processor.vocabulary_._mapping:
       arr=[]
       s = re.sub('[^0-9a-zA-Z]+', '', w)
@@ -166,7 +171,6 @@ with tf.Graph().as_default():
       if len(arr)>0:
         idx = vocab_processor.vocabulary_.get(w)
         initW[idx]=np.asarray(arr).astype(np.float32)
-    print("Done assigning intiW. len="+str(len(initW)))
     inpH.deletePreEmb()
     gc.collect()
     sess.run(siameseModel.W.assign(initW))
@@ -184,7 +188,7 @@ with tf.Graph().as_default():
     _, step, loss, pcc, rho, mse, dist, summaries = sess.run([train_op_set, global_step, siameseModel.loss, siameseModel.pcc, siameseModel.rho, siameseModel.mse, siameseModel.distance, train_summary_op], feed_dict)
     time_str = datetime.datetime.now().isoformat()
     if i % 100 == 0:
-      print("TRAIN {}: step {}, loss {}, pcc: {}, rho: {}, mse: {}".format(time_str, step, loss, pcc, rho, mse))
+      print("TRAIN {}: step {}, loss {}, pcc: {}, rho: {}, mse: {}".format(time_str, step, loss, pcc, rho, mse * FLAGS.y_scale))
     train_summary_writer.add_summary(summaries, step)
 
   def dev_step(x1_batch, x2_batch, y_batch, i):
@@ -200,15 +204,19 @@ with tf.Graph().as_default():
     step, loss, pcc, rho, mse, summaries = sess.run([global_step, siameseModel.loss, siameseModel.pcc, siameseModel.rho, siameseModel.mse, dev_summary_op], feed_dict)
     time_str = datetime.datetime.now().isoformat()
     if i % 100 == 0:
-      print("DEV {}: step {}, loss {}, rho {}, pcc {}, mse: {}".format(time_str, step, loss, pcc, rho, mse))
+      print("DEV {}: step {}, loss {}, pcc {}, rho {}, mse: {}".format(time_str, step, loss, pcc, rho, mse * FLAGS.y_scale))
     dev_summary_writer.add_summary(summaries, step)
-    return mse
+    return mse * FLAGS.y_scale
 
   # Generate batches
   batches = inpH.batch_iter(list(zip(train_set[0], train_set[1], train_set[2])), FLAGS.batch_size, FLAGS.num_epochs)
   max_validation_mse=0.0
 
-  for nn in xrange(sum_no_of_batches * FLAGS.num_epochs):
+  n_iterations = sum_no_of_batches * FLAGS.num_epochs
+  n_iterations = n_iterations if n_iterations < FLAGS.max_iterations else FLAGS.max_iterations
+
+  print('Total number of iterations %s.' % n_iterations)
+  for nn in xrange(n_iterations):
     batch = batches.next()
     if len(batch)<1:
       continue

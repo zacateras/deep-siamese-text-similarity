@@ -17,7 +17,7 @@ class SiameseLSTMw2v(object):
     with tf.name_scope("fw" + scope), tf.variable_scope("fw" + scope, reuse=tf.AUTO_REUSE):
       stacked_rnn_fw = []
       for n in nodes:
-        fw_cell = tf.nn.rnn_cell.BasicLSTMCell(n, forget_bias=1.0, state_is_tuple=True)
+        fw_cell = tf.nn.rnn_cell.BasicLSTMCell(int(n), forget_bias=1.0, state_is_tuple=True)
         lstm_fw_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=dropout)
         stacked_rnn_fw.append(lstm_fw_cell)
       lstm_fw_cell_m = tf.nn.rnn_cell.MultiRNNCell(cells=stacked_rnn_fw, state_is_tuple=True)
@@ -41,6 +41,19 @@ class SiameseLSTMw2v(object):
       tf.sqrt(tf.reduce_sum(tf.square(y_minus_mean))))
 
     return tf.divide(numerator, denominator, name=name)
+
+  def calculate_rho(self, x, y, batch_size, name=None):
+    x_rank = tf.add(tf.contrib.framework.argsort(x), 1)
+    y_rank = tf.add(tf.contrib.framework.argsort(y), 1)
+    d_rank = tf.subtract(x_rank, y_rank)
+
+    numerator = tf.cast(tf.multiply(6, tf.reduce_sum(tf.square(d_rank))), tf.float32)
+    denominator = batch_size * (batch_size * batch_size - 1.0)
+    
+    return tf.subtract(1.0, tf.divide(numerator, denominator), name=name)
+
+  def calculate_mse(self, x, y, name=None):
+    return tf.reduce_mean(tf.abs(tf.subtract(x, y)), name=name)
   
   def __init__(
     self, sequence_length, vocab_size, embedding_size, batch_size, trainableEmbeddings, tied, side1_nodes, side2_nodes):
@@ -93,13 +106,7 @@ class SiameseLSTMw2v(object):
       self.pcc = self.calculate_pcc(self.input_y_norm, self.output_y_norm, name="pcc")
 
     with tf.name_scope("rho"):
-      input_y_rank = tf.contrib.framework.argsort(self.input_y_norm)
-      output_y_rank = tf.contrib.framework.argsort(self.output_y_norm)
-      
-      self.rho = self.calculate_pcc(
-        tf.cast(input_y_rank, tf.float32),
-        tf.cast(output_y_rank, tf.float32), name="rho")
+      self.rho = self.calculate_rho(self.input_y_norm, self.output_y_norm, batch_size, name="rho")
 
     with tf.name_scope("mse"):
-      # SUM_i((y_i-(1-d_i))^2)) i from 1 to n
-      self.mse = tf.reduce_sum(tf.square(tf.subtract(self.input_y_norm, self.output_y_norm)), name="mse")
+      self.mse = self.calculate_mse(self.input_y_norm, self.output_y_norm, name="mse")

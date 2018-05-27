@@ -34,7 +34,6 @@ class InputHelper(object):
     return self.vocab_processor
 
   def loadW2V(self, emb_path, type="bin"):
-    print("Loading word2vec data...")
     num_keys = 0
     if type == "textgz":
       # this seems faster than gensim non-binary load
@@ -54,7 +53,6 @@ class InputHelper(object):
       self.pre_emb = Word2Vec.load_word2vec_format(emb_path, binary=True)
       self.pre_emb.init_sims(replace=True)
       num_keys = len(self.pre_emb.vocab)
-    print("Loaded word2vec of length: %s." % num_keys)
     gc.collect()
 
   def deletePreEmb(self):
@@ -121,7 +119,6 @@ class InputHelper(object):
     x1_train, x1_dev = x1_shuffled[:dev_idx], x1_shuffled[dev_idx:]
     x2_train, x2_dev = x2_shuffled[:dev_idx], x2_shuffled[dev_idx:]
     y_train, y_dev = y_shuffled[:dev_idx], y_shuffled[dev_idx:]
-    print("Train/Dev split for {}: {:d}/{:d}".format(path, len(y_train), len(y_dev)))
     sum_no_of_batches = sum_no_of_batches + (len(y_train)//batch_size)
     train_set = (x1_train, x2_train, y_train)
     dev_set = (x1_dev, x2_dev, y_dev)

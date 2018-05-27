@@ -11,11 +11,13 @@ from input_helpers import InputHelper
 
 # Parameters
 # ==================================================
-tf.flags.DEFINE_string("eval_filepath", "validation.txt0", "Evaluate on this data (Default: None)")
+tf.flags.DEFINE_string("eval_filepath", None, "Evaluate on this data (Default: None)")
+tf.flags.DEFINE_string("log_filepath", None, "Result log file path (Default: None)")
+tf.flags.DEFINE_string("log_event", None, "Result log event name (Default: None)")
 tf.flags.DEFINE_float("y_scale", 5.0, "scale of y in evaluation file (default: 5.0)")
 tf.flags.DEFINE_integer("y_position", 0, "position of y in evaluation file (default: 0)")
-tf.flags.DEFINE_integer("x1_position", 0, "position of x1 in training file (default: 1)")
-tf.flags.DEFINE_integer("x2_position", 0, "position of x2 in training file (default: 2)")
+tf.flags.DEFINE_integer("x1_position", 1, "position of x1 in training file (default: 1)")
+tf.flags.DEFINE_integer("x2_position", 2, "position of x2 in training file (default: 2)")
 
 # Eval Parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
@@ -28,11 +30,12 @@ tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on 
 
 FLAGS = tf.flags.FLAGS
 FLAGS(sys.argv)
-print("\nParameters:")
+
+print("EXECUTION PARAMETERS:")
 for attr, flag in sorted(FLAGS.__flags.items()):
   print("{}={}".format(attr.upper(), flag.value))
 
-if FLAGS.eval_filepath==None or FLAGS.vocab_filepath==None or FLAGS.model==None :
+if FLAGS.eval_filepath==None or FLAGS.vocab_filepath==None or FLAGS.model==None:
   print("Eval or Vocab filepaths are empty.")
   exit()
 
@@ -93,11 +96,23 @@ with graph.as_default():
           side1_dropout: 1.0,
           side2_dropout: 1.0
         })
+      
+      # rescale mse to fit initial domain
+      batch_mse = batch_mse * FLAGS.y_scale
 
       all_predictions = np.concatenate([all_predictions, batch_predictions])
       all_pcc = np.concatenate([all_pcc, [batch_pcc]])
       all_rho = np.concatenate([all_rho, [batch_rho]])
       all_mse = np.concatenate([all_mse, [batch_mse]])
-      print("DEV PCC:{} RHO:{} MSE:{}".format(batch_pcc, batch_rho, batch_mse))
 
-    print("AVG PCC:{:g} RHO:{:g} MSE:{:g}".format(np.mean(all_pcc), np.mean(all_rho), np.mean(all_mse)))
+    pcc = np.mean(all_pcc)
+    rho = np.mean(all_rho)
+    mse = np.mean(all_mse)
+
+    print("AVG PCC:{:g} RHO:{:g} MSE:{:g}".format(pcc, rho, mse))
+
+    # write evaluation log tsv event entry
+    if FLAGS.log_filepath is not None and FLAGS.log_event is not None:
+      with open(FLAGS.log_filepath, "a+") as f:
+        f.write('%s\t%s\t%s\t%s\r\n' % (FLAGS.log_event, pcc, rho, mse))
+
