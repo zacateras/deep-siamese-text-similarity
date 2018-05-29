@@ -7,7 +7,7 @@ sets=(
   # code x1 x2 y y_scale header path force
 
   'snli 0 1 2 1.0 False data/train_snli.txt False'
-  'sick2014 1 2 3 5.0 True data/sts/sick2014/SICK_train.txt False'
+  # 'sick2014 1 2 3 5.0 True data/sts/sick2014/SICK_train.txt False'
 )
 
 archs=(
@@ -17,6 +17,13 @@ archs=(
   'False 50,50,50 1.0 50,50,50 1.0 False'
   'False 150,100,50 1.0 150,100,50 1.0 False'
   'False 500,250,100 1.0 500,250,100 1.0 False'
+
+  'True 50,50,50 1.0 50,50,50 1.0 False'
+  'True 150,100,50 1.0 150,100,50 1.0 False'
+  'True 500,250,100 1.0 500,250,100 1.0 False'
+
+  'False 150,100,50 0.8 150,100,50 0.8 False'
+  'True 150,100,50 0.8 150,100,50 0.8 False'
 )
 
 max_iterations=50000
@@ -33,7 +40,13 @@ do
   do
     line_j=($j)
 
-    output_code="${line_j[0]}_1n-${line_i[1]}_1d-${line_i[2]}_2n-${line_i[3]}_2d-${line_i[4]}"
+    output_code="1n-${line_i[1]}_1d-${line_i[2]}_2n-${line_i[3]}_2d-${line_i[4]}"
+    if [ ${line_i} == "True" ]; then
+      output_code="${line_j[0]}_tied_$ouput_code"
+    else
+      output_code="${line_j[0]}_$output_code"
+    fi
+
     output_dirpath="$PWD/runs/$output_code"
 
     if [ -d $output_dirpath ]; then
