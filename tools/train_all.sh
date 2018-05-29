@@ -41,11 +41,7 @@ do
     line_j=($j)
 
     output_code="1n-${line_i[1]}_1d-${line_i[2]}_2n-${line_i[3]}_2d-${line_i[4]}"
-    if [ ${line_i} == "True" ]; then
-      output_code="${line_j[0]}_tied_$ouput_code"
-    else
-      output_code="${line_j[0]}_$output_code"
-    fi
+    output_code=$([ ${line_i} == "True" ] && echo ${line_j[0]}_tied_${output_code} || echo ${line_j[0]}_${output_code})
 
     output_dirpath="$PWD/runs/$output_code"
 
